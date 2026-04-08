@@ -271,6 +271,21 @@ for strategy, stats in summary.items():
 
 ---
 
+## Визуализация результатов
+
+Откройте `analysis.ipynb` в Jupyter Notebook для интерактивного анализа:
+
+```bash
+jupyter notebook analysis.ipynb
+```
+
+Ноутбук содержит:
+- **График 1** — Успешность парсинга, среднее кол-во спанов, время ответа API
+- **График 2** — Boxplot распределения спанов по стратегиям
+- **График 3** — Топ-10 меток для Structured и Few-Shot
+- **График 4** — Распределение sentiment (positive / negative / neutral)
+- **Таблица** — Сводные метрики по всем стратегиям
+
 ## Структура проекта
 
 ```
@@ -285,6 +300,7 @@ tguai-segmenter/
 │   ├── segment_review()      — основная функция
 │   ├── run_experiment()      — полный эксперимент
 │   └── summarize_results()   — агрегация метрик
+├── analysis.ipynb        # Jupyter notebook с визуализацией
 ├── merged_1209.json      # Датасет книжных отзывов (1209 записей)
 └── README.md
 ```
