@@ -32,7 +32,7 @@ PROVIDER = "openrouter"   # "deepseek" | "openrouter" | "anthropic"
 # DeepSeek: platform.deepseek.com → API Keys → Create
 # OpenRouter: openrouter.ai → Keys → Create Key
 # Anthropic: console.anthropic.com → API Keys
-API_KEY = "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"
+API_KEY = "ВСТАВЬ_КЛЮЧ_СЮДА"  # openrouter.ai → Keys → Create Key
 
 _CONFIGS = {
     "deepseek": {
@@ -383,8 +383,8 @@ if __name__ == "__main__":
     import sys
 
     dataset = sys.argv[1] if len(sys.argv) > 1 else "merged_1209.json"
-    print("=== Запуск эксперимента (3 отзыва × 3 стратегии) ===\n")
-    results = run_experiment(dataset, n_samples=3)
+    print("=== Запуск эксперимента (15 отзывов × 3 стратегии) ===\n")
+    results = run_experiment(dataset, n_samples=15)
     summary = summarize_results(results)
 
     print("\n=== Итоги ===")
