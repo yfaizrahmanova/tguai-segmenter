@@ -8,12 +8,9 @@ TGUAI — Модуль сегментации и классификации от
   - Верификация и восстановление при ошибках
   - Сравнение prompt-стратегий (baseline vs structured vs few-shot)
 
-Поддерживаемые провайдеры (выбрать в PROVIDER ниже):
-  "deepseek"   — api.deepseek.com, бесплатно 5М токенов при регистрации
-                 регистрация: platform.deepseek.com (только email, без VPN)
-  "openrouter" — openrouter.ai, бесплатный tier для deepseek-v3
-                 регистрация: openrouter.ai (email или Google)
-  "anthropic"  — для ВКР, требует платного ключа
+Провайдер: OpenRouter (openrouter.ai)
+  - Бесплатный tier, регистрация через email или Google
+  - Получить ключ: openrouter.ai → Keys → Create Key
 """
 
 import json
@@ -25,13 +22,10 @@ import urllib.request
 
 
 # ─── Конфигурация ────────────────────────────────────────────────────────────
-# Выбери провайдера и вставь свой ключ:
+# Вставь свой ключ от OpenRouter: openrouter.ai → Keys → Create Key
 
-PROVIDER = "openrouter"   # "deepseek" | "openrouter" | "anthropic"
+PROVIDER = "openrouter"
 
-# DeepSeek: platform.deepseek.com → API Keys → Create
-# OpenRouter: openrouter.ai → Keys → Create Key
-# Anthropic: console.anthropic.com → API Keys
 API_KEY = "ВСТАВЬ_КЛЮЧ_СЮДА"  # openrouter.ai → Keys → Create Key
 
 _CONFIGS = {
