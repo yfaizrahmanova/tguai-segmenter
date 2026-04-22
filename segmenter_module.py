@@ -307,6 +307,128 @@ def segment_review(
     }
 
 
+# ─── Загрузка сырых отзывов ───────────────────────────────────────────────────
+
+def load_raw_reviews(path: str, text_column: str = "Текст отзыва") -> list[str]:
+    """
+    Загружает сырые отзывы (без аннотаций) из файла.
+    Поддерживаемые форматы:
+      - .csv : колонка text_column (по умолчанию 'Текст отзыва')
+      - .txt : каждая непустая строка — отдельный отзыв
+      - .json: массив строк ["отзыв1", "отзыв2", ...]
+               или массив объектов [{"text": "..."}, ...]
+    """
+    import csv
+
+    with open(path, encoding="utf-8") as f:
+        if path.endswith(".csv"):
+            reader = csv.DictReader(f)
+            return [
+                row[text_column].strip()
+                for row in reader
+                if row.get(text_column, "").strip()
+            ]
+        elif path.endswith(".json"):
+            data = json.load(f)
+            if data and isinstance(data[0], str):
+                return data
+            return [item["text"] for item in data if item.get("text")]
+        else:
+            return [line.strip() for line in f if line.strip()]
+
+
+def process_raw_file(
+    raw_path: str,
+    library_path: str = "merged_1209.json",
+    strategy: str = "structured",
+    output_path: Optional[str] = None,
+    seed: int = 42,
+) -> list[dict]:
+    """
+    Сегментирует отзывы из сырого файла, используя аннотированную библиотеку
+    только как источник few-shot примеров.
+
+    raw_path     — файл с сырыми отзывами (.txt или .json)
+    library_path — аннотированный датасет для few-shot примеров
+    strategy     — 'baseline' | 'structured' | 'few_shot'
+    output_path  — если указан, сохраняет результаты в JSON
+    """
+    reviews = load_raw_reviews(raw_path)
+
+    examples = []
+    if strategy == "few_shot":
+        with open(library_path, encoding="utf-8") as f:
+            library = json.load(f)
+        random.seed(seed)
+        examples = random.sample(library, min(5, len(library)))
+
+    results = []
+    for i, text in enumerate(reviews):
+        print(f"[{i+1}/{len(reviews)}] Обрабатываем отзыв ({len(text)} симв.)...")
+        try:
+            res = segment_review(text, strategy=strategy, examples=examples)
+            res["review_text"] = text
+            res["sample_idx"]  = i
+            results.append(res)
+            print(f"  → {res['n_spans']} спанов, {res['n_errors']} ошибок "
+                  f"({res['elapsed_sec']}s)")
+        except Exception as e:
+            print(f"  → ОШИБКА: {e}")
+        time.sleep(0.5)
+
+    if output_path:
+        with open(output_path, "w", encoding="utf-8") as f:
+            json.dump({"results": results, "analytics": analyze_segments(results)},
+                      f, ensure_ascii=False, indent=2)
+        print(f"\nРезультаты сохранены: {output_path}")
+
+    return results
+
+
+def analyze_segments(results: list[dict]) -> dict:
+    """
+    Лёгкая аналитика по сегментам:
+      - всего отзывов и спанов
+      - топ-10 меток
+      - распределение sentiment
+      - среднее спанов на отзыв
+    """
+    from collections import Counter
+
+    label_counter     = Counter()
+    sentiment_counter = Counter()
+    total_spans       = 0
+    success_count     = sum(1 for r in results if r["success"])
+
+    for r in results:
+        spans = r.get("validation", {}).get("spans", [])
+        total_spans += len(spans)
+        for span in spans:
+            label_counter[span.get("label", "?")] += 1
+            sentiment_counter[span.get("sentiment", "neutral")] += 1
+
+    n = len(results) or 1
+    analytics = {
+        "total_reviews":    len(results),
+        "success_rate":     round(success_count / n * 100, 1),
+        "total_spans":      total_spans,
+        "avg_spans":        round(total_spans / n, 2),
+        "top_labels":       label_counter.most_common(10),
+        "sentiment_dist":   dict(sentiment_counter),
+    }
+
+    print("\n=== Аналитика сегментов ===")
+    print(f"Отзывов обработано : {analytics['total_reviews']}")
+    print(f"Успешных парсингов : {analytics['success_rate']}%")
+    print(f"Всего спанов       : {analytics['total_spans']}  (avg {analytics['avg_spans']} на отзыв)")
+    print(f"Sentiment          : {analytics['sentiment_dist']}")
+    print("Топ-10 меток:")
+    for label, cnt in analytics["top_labels"]:
+        print(f"  {label:<30} {cnt}")
+
+    return analytics
+
+
 # ─── Эксперимент: сравнение стратегий ────────────────────────────────────────
 
 def run_experiment(dataset_path: str, n_samples: int = 10, seed: int = 42) -> list[dict]:
@@ -376,13 +498,22 @@ def summarize_results(results: list[dict]) -> dict:
 if __name__ == "__main__":
     import sys
 
-    dataset = sys.argv[1] if len(sys.argv) > 1 else "merged_1209.json"
-    print("=== Запуск эксперимента (15 отзывов × 3 стратегии) ===\n")
-    results = run_experiment(dataset, n_samples=15)
-    summary = summarize_results(results)
+    # Режим 1: python segmenter_module.py --raw reviews.txt [strategy] [output.json]
+    # Режим 2: python segmenter_module.py [dataset.json]   (эксперимент сравнения стратегий)
+    if len(sys.argv) > 1 and sys.argv[1] == "--raw":
+        raw_path    = sys.argv[2] if len(sys.argv) > 2 else "reviews.txt"
+        strategy    = sys.argv[3] if len(sys.argv) > 3 else "structured"
+        output_path = sys.argv[4] if len(sys.argv) > 4 else "segmented_results.json"
+        print(f"=== Сегментация сырых отзывов: {raw_path} (стратегия: {strategy}) ===\n")
+        results = process_raw_file(raw_path, strategy=strategy, output_path=output_path)
+    else:
+        dataset = sys.argv[1] if len(sys.argv) > 1 else "merged_1209.json"
+        print("=== Запуск эксперимента (15 отзывов × 3 стратегии) ===\n")
+        results = run_experiment(dataset, n_samples=15)
+        summary = summarize_results(results)
 
-    print("\n=== Итоги ===")
-    for strat, s in summary.items():
-        print(f"{strat:12s} | успех {s['success_rate']}% | "
-              f"спанов {s['avg_spans']} | ошибок {s['avg_errors']} | "
-              f"исправлено {s['avg_fixed']}")
+        print("\n=== Итоги ===")
+        for strat, s in summary.items():
+            print(f"{strat:12s} | успех {s['success_rate']}% | "
+                  f"спанов {s['avg_spans']} | ошибок {s['avg_errors']} | "
+                  f"исправлено {s['avg_fixed']}")
