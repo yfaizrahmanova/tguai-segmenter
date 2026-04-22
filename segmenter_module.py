@@ -39,11 +39,6 @@ _CONFIGS = {
         "model": "openai/gpt-oss-120b:free",  # бесплатная квота
         "fmt":   "openai",
     },
-    "anthropic": {
-        "url":   "https://api.anthropic.com/v1/messages",
-        "model": "claude-sonnet-4-20250514",
-        "fmt":   "anthropic",
-    },
 }
 
 _CFG = _CONFIGS[PROVIDER]
@@ -105,61 +100,30 @@ def prompt_few_shot(text: str, examples: list[dict]) -> str:
 # ─── API-клиент ───────────────────────────────────────────────────────────────
 
 def call_llm(prompt: str, system: str = "", max_tokens: int = 1000) -> str:
-    """
-    Универсальный HTTP-клиент.
-    Поддерживает OpenAI-совместимый формат (DeepSeek, OpenRouter)
-    и Anthropic формат.
-    """
+    """Универсальный HTTP-клиент для OpenAI-совместимых провайдеров (OpenRouter)."""
     cfg = _CFG
 
-    if cfg["fmt"] == "openai":
-        messages = []
-        if system:
-            messages.append({"role": "system", "content": system})
-        messages.append({"role": "user", "content": prompt})
-        body = {
-            "model": cfg["model"],
-            "max_tokens": max_tokens,
-            "messages": messages,
-        }
-        headers = {
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {API_KEY}",
-        }
-        # OpenRouter требует дополнительный заголовок
-        if PROVIDER == "openrouter":
-            headers["HTTP-Referer"] = "https://github.com/tguai-project"
-            headers["X-Title"] = "TGUAI Segmenter"
+    messages = []
+    if system:
+        messages.append({"role": "system", "content": system})
+    messages.append({"role": "user", "content": prompt})
+    body = {
+        "model": cfg["model"],
+        "max_tokens": max_tokens,
+        "messages": messages,
+    }
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {API_KEY}",
+        "HTTP-Referer": "https://github.com/tguai-project",
+        "X-Title": "TGUAI Segmenter",
+    }
 
-        data = json.dumps(body).encode()
-        req  = urllib.request.Request(cfg["url"], data=data, headers=headers, method="POST")
-        with urllib.request.urlopen(req) as resp:
-            result = json.loads(resp.read())
-        return result["choices"][0]["message"]["content"]
-
-    else:  # anthropic
-        messages = [{"role": "user", "content": prompt}]
-        body = {
-            "model": cfg["model"],
-            "max_tokens": max_tokens,
-            "messages": messages,
-        }
-        if system:
-            body["system"] = system
-        headers = {
-            "Content-Type": "application/json",
-            "x-api-key": API_KEY,
-            "anthropic-version": "2023-06-01",
-        }
-        data = json.dumps(body).encode()
-        req  = urllib.request.Request(cfg["url"], data=data, headers=headers, method="POST")
-        with urllib.request.urlopen(req) as resp:
-            result = json.loads(resp.read())
-        return result["content"][0]["text"]
-
-
-# Алиас для обратной совместимости
-call_claude = call_llm
+    data = json.dumps(body).encode()
+    req  = urllib.request.Request(cfg["url"], data=data, headers=headers, method="POST")
+    with urllib.request.urlopen(req) as resp:
+        result = json.loads(resp.read())
+    return result["choices"][0]["message"]["content"]
 
 
 # ─── Парсинг и валидация вывода ───────────────────────────────────────────────
